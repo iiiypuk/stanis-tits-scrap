@@ -32,7 +32,7 @@ while STOP == False:
     images = soup.findAll('img', src=re.compile('img/*'))
 
     for image in images:
-        if int(image['src'].split('/')[1].split('.')[0]) == int(LATEST_FILE):
+        if image['src'].split('/')[1].split('.')[0] == LATEST_FILE:
             STOP = True
 
         if PAGE == 0:
