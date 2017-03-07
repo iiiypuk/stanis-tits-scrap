@@ -20,7 +20,7 @@ def checkResumeFile():
 
         with open('{0}/.resume'.format(DOWNLOAD_DIR,), 'w') as f:
             f.write('0')
-            return(0)
+            return([0])
     else:
         with open('{0}/.resume'.format(DOWNLOAD_DIR,), 'r') as f:
             lines = [line.split('\n')[0] for line in f][-20:]
