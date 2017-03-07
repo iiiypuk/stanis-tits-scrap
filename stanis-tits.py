@@ -7,53 +7,78 @@ import requests
 from bs4 import BeautifulSoup
 
 __author__ = 'Alexander Popov'
-__version__ = '0.1.0'
+__version__ = '1.0.0'
 __license__ = 'Unlicense'
 
-dwnImageDir = './images'
-cookies = dict(block='951')
-siteUrl = 'http://blog.stanis.ru/?back=%d'
-imgPage = 0
+DOWNLOAD_DIR = './images'
 
-# create .stanis-tits.latest file and download image directory
-if not os.path.exists('%s/.stanis-tits.latest' % dwnImageDir):
-    if not os.path.exists('%s' % dwnImageDir):
-        os.mkdir('%s' % dwnImageDir)
 
-    with open('%s/.stanis-tits.latest' % dwnImageDir, 'w') as f:
-        f.write('0')
+def checkResumeFile():
+    if not os.path.exists('{0}/.resume'.format(DOWNLOAD_DIR,)):
+        if not os.path.exists(DOWNLOAD_DIR):
+            os.mkdir(DOWNLOAD_DIR)
 
-with open('%s/.stanis-tits.latest' % dwnImageDir, 'r') as f:
-    latestDwnFile = f.read()
+        with open('{0}/.resume'.format(DOWNLOAD_DIR,), 'w') as f:
+            f.write('0')
+            return(0)
+    else:
+        with open('{0}/.resume'.format(DOWNLOAD_DIR,), 'r') as f:
+            lines = [line.split('\n')[0] for line in f][-20:]
 
-STOP = False
-NEXT_LATEST = None
+            return(lines)
 
-while STOP is False:
-    print('Loading page %d' % imgPage)
 
-    r = requests.get(siteUrl % imgPage, cookies=cookies)
+def saveResume(resumeList):
+    resumeList.sort()
+    with open('{0}/.resume'.format(DOWNLOAD_DIR,), 'w', encoding='utf-8') as f:
+        for item in resumeList[-20:]:
+            f.write('{0}\n'.format(item))
+
+
+def getImagesLinks(page):
+    URL = lambda page: 'http://blog.stanis.ru/?back={0}'.format(page,)
+    COOKIES = dict(block='951')
+
+    r = requests.get(URL(page), cookies=COOKIES)
     soup = BeautifulSoup(r.text.encode('cp1251'),
                          "html.parser", from_encoding="windows-1251")
-    images = soup.findAll('img', src=re.compile('img/*'))
 
-    for image in images:
-        if image['src'].split('/')[1].split('.')[0] == latestDwnFile:
-            STOP = True
+    imagesData = soup.findAll('img', src=re.compile('img/*'))
 
-        if imgPage == 0:
-            if NEXT_LATEST is None:
-                NEXT_LATEST = str(image['src'].split('/')[1].split('.')[0])
-                with open('%s/.stanis-tits.latest' % dwnImageDir, 'w+') as f:
-                    f.write(NEXT_LATEST)
+    imagesUrl = list()
 
-        if not os.path.exists('%s/%s' % (dwnImageDir,
-                              image['src'].split('/')[1],)):
-            print('\tDownload %s' % image['src'].split('/')[1])
-            response = requests.get('http://blog.stanis.ru/%s'
-                                    % image['src'], stream=True)
-            with open('%s/%s' % (dwnImageDir, image['src'].split('/')[1]),
-                      'wb') as out_image:
-                shutil.copyfileobj(response.raw, out_image,)
+    for image in imagesData:
+        imagesUrl.append(image['src'].split('/')[1])
 
-    imgPage += 1
+    return(imagesUrl)
+
+
+def imageDownload(image):
+    response = requests.get('https://blog.stanis.ru/img/{0}'.format(image,),
+                            stream=True)
+
+    with open('{0}/{1}'.format(DOWNLOAD_DIR, image),
+              'wb') as out_image:
+        shutil.copyfileobj(response.raw, out_image,)
+
+
+if __name__ == '__main__':
+    resumeFiles = checkResumeFile()
+
+    LOOP = True
+    downloadPage = 0
+
+    while LOOP:
+        imagesLinks = getImagesLinks(downloadPage)
+        imagesLinks.sort()
+
+        for image in imagesLinks:
+            if not image.split('.')[0] in resumeFiles:
+                imageDownload(image)
+                resumeFiles.insert(0, image.split('.')[0],)
+            else:
+                LOOP = False
+
+        downloadPage += 1
+
+    saveResume(resumeFiles)
